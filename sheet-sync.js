@@ -95,40 +95,38 @@
       return null;
     }
 
-    const iframeName = `livesell_sync_${Date.now()}_${Math.random()
-      .toString(36)
-      .slice(2)}`;
-    const iframe = document.createElement("iframe");
-    iframe.name = iframeName;
-    iframe.style.display = "none";
+    return new Promise((resolve, reject) => {
+      const callbackName = `__livesellWrite_${Date.now()}_${Math.random()
+        .toString(36)
+        .slice(2)}`;
+      const script = document.createElement("script");
+      const requestPayload = encodeURIComponent(
+        JSON.stringify({
+          action,
+          stockSheetName: config.stockSheetName || "Estoque",
+          salesSheetName: config.salesSheetName || "Vendas",
+          ...payload,
+        })
+      );
 
-    const form = document.createElement("form");
-    form.method = "POST";
-    form.action = endpoint;
-    form.target = iframeName;
-    form.style.display = "none";
+      const cleanup = () => {
+        delete window[callbackName];
+        script.remove();
+      };
 
-    const input = document.createElement("input");
-    input.type = "hidden";
-    input.name = "payload";
-    input.value = JSON.stringify({
-      action,
-      stockSheetName: config.stockSheetName || "Estoque",
-      salesSheetName: config.salesSheetName || "Vendas",
-      ...payload,
+      window[callbackName] = (response) => {
+        cleanup();
+        resolve(response || { ok: true });
+      };
+
+      script.onerror = () => {
+        cleanup();
+        reject(new Error("Falha ao enviar dados para a planilha."));
+      };
+
+      script.src = `${endpoint}?callback=${callbackName}&payload=${requestPayload}`;
+      document.head.appendChild(script);
     });
-
-    form.appendChild(input);
-    document.body.appendChild(iframe);
-    document.body.appendChild(form);
-    form.submit();
-
-    setTimeout(() => {
-      form.remove();
-      iframe.remove();
-    }, 2000);
-
-    return { ok: true };
   }
 
   async function requestBootstrapViaJsonp() {

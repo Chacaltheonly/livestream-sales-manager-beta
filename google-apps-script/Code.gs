@@ -2,17 +2,33 @@ const DEFAULT_STOCK_SHEET = "Estoque";
 const DEFAULT_SALES_SHEET = "Vendas";
 
 function doGet(e) {
+  const payload = parsePayloadFromParams_(e);
+  const callback = getParam_(e, "callback");
+
+  if (payload.action === "syncProducts") {
+    syncProducts_(payload.products || [], payload.stockSheetName || DEFAULT_STOCK_SHEET);
+    return callback
+      ? javascriptResponse_(callback, { ok: true })
+      : jsonResponse_({ ok: true });
+  }
+
+  if (payload.action === "syncSales") {
+    syncSales_(payload.sales || [], payload.salesSheetName || DEFAULT_SALES_SHEET);
+    return callback
+      ? javascriptResponse_(callback, { ok: true })
+      : jsonResponse_({ ok: true });
+  }
+
   const action = getParam_(e, "action");
 
   if (action === "bootstrap") {
-    const payload = buildBootstrapPayload_();
-    const callback = getParam_(e, "callback");
+    const bootstrapPayload = buildBootstrapPayload_();
 
     if (callback) {
-      return javascriptResponse_(callback, payload);
+      return javascriptResponse_(callback, bootstrapPayload);
     }
 
-    return jsonResponse_(payload);
+    return jsonResponse_(bootstrapPayload);
   }
 
   return jsonResponse_({
@@ -209,6 +225,11 @@ function parseBody_(e) {
 
 function getParam_(e, key) {
   return e && e.parameter ? e.parameter[key] : "";
+}
+
+function parsePayloadFromParams_(e) {
+  const payload = getParam_(e, "payload");
+  return payload ? JSON.parse(payload) : {};
 }
 
 function createId_() {
