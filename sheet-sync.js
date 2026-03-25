@@ -95,25 +95,40 @@
       return null;
     }
 
-    const body = new URLSearchParams({
-      payload: JSON.stringify({
-        action,
-        stockSheetName: config.stockSheetName || "Estoque",
-        salesSheetName: config.salesSheetName || "Vendas",
-        ...payload,
-      }),
+    const iframeName = `livesell_sync_${Date.now()}_${Math.random()
+      .toString(36)
+      .slice(2)}`;
+    const iframe = document.createElement("iframe");
+    iframe.name = iframeName;
+    iframe.style.display = "none";
+
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = endpoint;
+    form.target = iframeName;
+    form.style.display = "none";
+
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = "payload";
+    input.value = JSON.stringify({
+      action,
+      stockSheetName: config.stockSheetName || "Estoque",
+      salesSheetName: config.salesSheetName || "Vendas",
+      ...payload,
     });
 
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-      },
-      mode: "no-cors",
-      body: body.toString(),
-    });
+    form.appendChild(input);
+    document.body.appendChild(iframe);
+    document.body.appendChild(form);
+    form.submit();
 
-    return response;
+    setTimeout(() => {
+      form.remove();
+      iframe.remove();
+    }, 2000);
+
+    return { ok: true };
   }
 
   async function requestBootstrapViaJsonp() {
