@@ -138,71 +138,37 @@
       return null;
     }
 
-    return new Promise((resolve, reject) => {
-      const frameName = `__livesellPost_${Date.now()}_${Math.random()
-        .toString(36)
-        .slice(2)}`;
-      const iframe = document.createElement("iframe");
-      const form = document.createElement("form");
-      const payloadInput = document.createElement("input");
-      let submitStarted = false;
-      let settled = false;
+    const requestBody = new URLSearchParams({
+      payload: JSON.stringify(buildRequestPayload(action, payload)),
+    }).toString();
 
-      const cleanup = () => {
-        if (iframe.parentNode) {
-          iframe.parentNode.removeChild(iframe);
-        }
+    if (navigator.sendBeacon) {
+      const sent = navigator.sendBeacon(
+        endpoint,
+        new Blob([requestBody], {
+          type: "application/x-www-form-urlencoded;charset=UTF-8",
+        })
+      );
 
-        if (form.parentNode) {
-          form.parentNode.removeChild(form);
-        }
-      };
+      if (sent) {
+        return { ok: true, mode: "beacon" };
+      }
+    }
 
-      const finish = (handler) => {
-        if (settled) {
-          return;
-        }
+    try {
+      await fetch(endpoint, {
+        method: "POST",
+        mode: "no-cors",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+        },
+        body: requestBody,
+      });
 
-        settled = true;
-        window.clearTimeout(timeoutId);
-        window.setTimeout(cleanup, 0);
-        handler();
-      };
-
-      iframe.name = frameName;
-      iframe.style.display = "none";
-
-      form.method = "POST";
-      form.action = endpoint;
-      form.target = frameName;
-      form.style.display = "none";
-
-      payloadInput.type = "hidden";
-      payloadInput.name = "payload";
-      payloadInput.value = JSON.stringify(buildRequestPayload(action, payload));
-      form.appendChild(payloadInput);
-
-      iframe.onload = () => {
-        if (!submitStarted) {
-          return;
-        }
-
-        finish(() => resolve({ ok: true }));
-      };
-
-      iframe.onerror = () => {
-        finish(() => reject(new Error("Falha ao enviar dados para a planilha.")));
-      };
-
-      const timeoutId = window.setTimeout(() => {
-        finish(() => reject(new Error("Tempo limite ao sincronizar com a planilha.")));
-      }, 15000);
-
-      document.body.appendChild(iframe);
-      document.body.appendChild(form);
-      submitStarted = true;
-      form.submit();
-    });
+      return { ok: true, mode: "no-cors" };
+    } catch (error) {
+      throw new Error("Falha ao enviar dados para a planilha.");
+    }
   }
 
   async function requestBootstrapViaJsonp() {
