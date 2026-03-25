@@ -49,6 +49,27 @@
     return button;
   }
 
+  function createSwitch(label, activeClassName, isActive, onClick) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "report-switch-group";
+
+    const text = document.createElement("span");
+    text.className = "report-switch-label";
+    text.textContent = label;
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `report-switch ${isActive ? activeClassName : ""}`.trim();
+    button.setAttribute("role", "switch");
+    button.setAttribute("aria-checked", isActive ? "true" : "false");
+    button.setAttribute("aria-label", label);
+    button.addEventListener("click", onClick);
+
+    wrapper.appendChild(text);
+    wrapper.appendChild(button);
+    return wrapper;
+  }
+
   function renderToolbar(reportRoot, state) {
     const headerCard = reportRoot.firstElementChild;
     if (!headerCard) {
@@ -117,41 +138,33 @@
     }
 
     tools.appendChild(
-      createButton(
-        customerState.warned ? "Desmarcar aviso" : "Marcar avisado",
-        customerState.warned ? "active-warned" : "",
-        () => {
-          const nextState = readState();
-          const current = nextState[customerKey] || {};
-          nextState[customerKey] = {
-            ...current,
-            customerName,
-            warned: !current.warned,
-            updatedAt: Date.now(),
-          };
-          writeState(nextState);
-          enhanceReport();
-        }
-      )
+      createSwitch("Avisado", "active-warned", !!customerState.warned, () => {
+        const nextState = readState();
+        const current = nextState[customerKey] || {};
+        nextState[customerKey] = {
+          ...current,
+          customerName,
+          warned: !current.warned,
+          updatedAt: Date.now(),
+        };
+        writeState(nextState);
+        enhanceReport();
+      })
     );
 
     tools.appendChild(
-      createButton(
-        customerState.pickedUp ? "Desmarcar retirada" : "Marcar retirou",
-        customerState.pickedUp ? "active-picked" : "",
-        () => {
-          const nextState = readState();
-          const current = nextState[customerKey] || {};
-          nextState[customerKey] = {
-            ...current,
-            customerName,
-            pickedUp: !current.pickedUp,
-            updatedAt: Date.now(),
-          };
-          writeState(nextState);
-          enhanceReport();
-        }
-      )
+      createSwitch("Retirou", "active-picked", !!customerState.pickedUp, () => {
+        const nextState = readState();
+        const current = nextState[customerKey] || {};
+        nextState[customerKey] = {
+          ...current,
+          customerName,
+          pickedUp: !current.pickedUp,
+          updatedAt: Date.now(),
+        };
+        writeState(nextState);
+        enhanceReport();
+      })
     );
 
     tools.appendChild(
