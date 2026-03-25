@@ -87,7 +87,7 @@
     toolbar.appendChild(resetButton);
   }
 
-  function renderCardControls(card, state, customerKey) {
+  function renderCardControls(card, state, customerKey, customerName) {
     const headerRow = card.querySelector(".p-6.bg-slate-50");
     const titleWrap = headerRow ? headerRow.querySelector("h4")?.parentElement : null;
     if (!headerRow || !titleWrap) {
@@ -125,7 +125,9 @@
           const current = nextState[customerKey] || {};
           nextState[customerKey] = {
             ...current,
+            customerName,
             warned: !current.warned,
+            updatedAt: Date.now(),
           };
           writeState(nextState);
           enhanceReport();
@@ -142,7 +144,9 @@
           const current = nextState[customerKey] || {};
           nextState[customerKey] = {
             ...current,
+            customerName,
             pickedUp: !current.pickedUp,
+            updatedAt: Date.now(),
           };
           writeState(nextState);
           enhanceReport();
@@ -159,7 +163,9 @@
           const current = nextState[customerKey] || {};
           nextState[customerKey] = {
             ...current,
+            customerName,
             hidden: !current.hidden,
+            updatedAt: Date.now(),
           };
           writeState(nextState);
           enhanceReport();
@@ -184,7 +190,7 @@
         return;
       }
 
-      renderCardControls(card, state, customerKey);
+      renderCardControls(card, state, customerKey, customerName);
 
       const customerState = state[customerKey] || {};
       card.style.display = customerState.hidden ? "none" : "";

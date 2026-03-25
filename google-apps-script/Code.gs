@@ -1,5 +1,6 @@
 const DEFAULT_STOCK_SHEET = "Estoque";
 const DEFAULT_SALES_SHEET = "Vendas";
+const DEFAULT_REPORT_STATUS_SHEET = "StatusRelatorio";
 
 function doGet(e) {
   const payload = parsePayloadFromParams_(e);
@@ -14,6 +15,16 @@ function doGet(e) {
 
   if (payload.action === "syncSales") {
     syncSales_(payload.sales || [], payload.salesSheetName || DEFAULT_SALES_SHEET);
+    return callback
+      ? javascriptResponse_(callback, { ok: true })
+      : jsonResponse_({ ok: true });
+  }
+
+  if (payload.action === "syncReportStatuses") {
+    syncReportStatuses_(
+      payload.reportStatuses || {},
+      payload.reportStatusSheetName || DEFAULT_REPORT_STATUS_SHEET
+    );
     return callback
       ? javascriptResponse_(callback, { ok: true })
       : jsonResponse_({ ok: true });
@@ -51,6 +62,14 @@ function doPost(e) {
     return jsonResponse_({ ok: true });
   }
 
+  if (action === "syncReportStatuses") {
+    syncReportStatuses_(
+      payload.reportStatuses || {},
+      payload.reportStatusSheetName || DEFAULT_REPORT_STATUS_SHEET
+    );
+    return jsonResponse_({ ok: true });
+  }
+
   return jsonResponse_({
     ok: false,
     error: "Acao POST nao suportada.",
@@ -62,6 +81,7 @@ function buildBootstrapPayload_() {
     ok: true,
     products: readProducts_(DEFAULT_STOCK_SHEET),
     sales: readSales_(DEFAULT_SALES_SHEET),
+    reportStatuses: readReportStatuses_(DEFAULT_REPORT_STATUS_SHEET),
   };
 }
 
@@ -112,6 +132,38 @@ function readSales_(sheetName) {
       quantity: Number(row[5] || 0),
       salePrice: Number(row[6] || 0),
     }));
+}
+
+function readReportStatuses_(sheetName) {
+  const sheet = getOrCreateSheet_(sheetName, [
+    "customerKey",
+    "Cliente",
+    "Avisado",
+    "Retirou",
+    "Oculto",
+    "AtualizadoEm",
+  ]);
+  const values = getDataRows_(sheet);
+  const statuses = {};
+
+  values
+    .filter((row) => row[0] || row[1])
+    .forEach((row) => {
+      const customerKey = String(row[0] || "").trim().toLowerCase();
+      if (!customerKey) {
+        return;
+      }
+
+      statuses[customerKey] = {
+        customerName: String(row[1] || "").trim(),
+        warned: toBoolean_(row[2]),
+        pickedUp: toBoolean_(row[3]),
+        hidden: toBoolean_(row[4]),
+        updatedAt: Number(row[5] || 0),
+      };
+    });
+
+  return statuses;
 }
 
 function syncProducts_(products, sheetName) {
@@ -169,6 +221,35 @@ function syncSales_(sales, sheetName) {
     Number(sale.quantity || 0),
     Number(sale.salePrice || 0),
     Number((sale.quantity || 0) * (sale.salePrice || 0)),
+  ]);
+
+  sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+}
+
+function syncReportStatuses_(reportStatuses, sheetName) {
+  const sheet = getOrCreateSheet_(sheetName, [
+    "customerKey",
+    "Cliente",
+    "Avisado",
+    "Retirou",
+    "Oculto",
+    "AtualizadoEm",
+  ]);
+
+  clearDataKeepHeader_(sheet);
+
+  const entries = Object.entries(reportStatuses || {});
+  if (!entries.length) {
+    return;
+  }
+
+  const rows = entries.map(([customerKey, status]) => [
+    customerKey,
+    status.customerName || customerKey,
+    Boolean(status.warned),
+    Boolean(status.pickedUp),
+    Boolean(status.hidden),
+    Number(status.updatedAt || Date.now()),
   ]);
 
   sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
@@ -263,4 +344,17 @@ function getFormField_(raw, key) {
   }
 
   return "";
+}
+
+function toBoolean_(value) {
+  if (value === true || value === false) {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    return value === 1;
+  }
+
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "true" || normalized === "1" || normalized === "sim";
 }

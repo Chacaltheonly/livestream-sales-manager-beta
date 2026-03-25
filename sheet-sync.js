@@ -1,6 +1,7 @@
 (function () {
   const PRODUCTS_KEY = "live_sales_products";
   const SALES_KEY = "live_sales_history";
+  const REPORT_STATUS_KEY = "livesell_report_customer_status";
   const LEGACY_SALES_ENDPOINT =
     "https://script.google.com/macros/s/AKfycbxBRwb6PlgwWH8IZztF3nO9dCWQwmewSGCOkPE4zAGP_rOGEVwioW6kzMXOR3DVlgGt/exec";
   const config = window.LIVESELL_CONFIG || {};
@@ -10,6 +11,7 @@
   let applyingRemoteState = false;
   let productsTimer = null;
   let salesTimer = null;
+  let reportStatusTimer = null;
 
   function normalizeText(value) {
     return String(value || "").trim();
@@ -31,12 +33,27 @@
     }
   }
 
+  function parseObjectSafely(raw) {
+    if (!raw) return {};
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    } catch (error) {
+      console.warn("Nao foi possivel ler objeto salvo localmente.", error);
+      return {};
+    }
+  }
+
   function readProducts() {
     return parseJsonSafely(localStorage.getItem(PRODUCTS_KEY));
   }
 
   function readSales() {
     return parseJsonSafely(localStorage.getItem(SALES_KEY));
+  }
+
+  function readReportStatuses() {
+    return parseObjectSafely(localStorage.getItem(REPORT_STATUS_KEY));
   }
 
   function normalizeProductRow(row) {
@@ -95,6 +112,7 @@
       action,
       stockSheetName: config.stockSheetName || "Estoque",
       salesSheetName: config.salesSheetName || "Vendas",
+      reportStatusSheetName: config.reportStatusSheetName || "StatusRelatorio",
       ...payload,
     };
   }
@@ -212,10 +230,15 @@
       const sales = Array.isArray(payload.sales)
         ? payload.sales.map(normalizeSaleRow).filter(Boolean)
         : [];
+      const reportStatuses =
+        payload.reportStatuses && typeof payload.reportStatuses === "object"
+          ? payload.reportStatuses
+          : {};
 
       applyingRemoteState = true;
       localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
       localStorage.setItem(SALES_KEY, JSON.stringify(sales));
+      localStorage.setItem(REPORT_STATUS_KEY, JSON.stringify(reportStatuses));
       applyingRemoteState = false;
     } catch (error) {
       applyingRemoteState = false;
@@ -253,6 +276,23 @@
     }, debounceMs);
   }
 
+  function scheduleReportStatusSync() {
+    if (!endpoint || applyingRemoteState) {
+      return;
+    }
+
+    clearTimeout(reportStatusTimer);
+    reportStatusTimer = setTimeout(async () => {
+      try {
+        await postJson("syncReportStatuses", {
+          reportStatuses: readReportStatuses(),
+        });
+      } catch (error) {
+        console.error("Falha ao sincronizar status do relatorio.", error);
+      }
+    }, debounceMs);
+  }
+
   const originalSetItem = Storage.prototype.setItem;
   Storage.prototype.setItem = function (key, value) {
     originalSetItem.call(this, key, value);
@@ -267,6 +307,10 @@
 
     if (key === SALES_KEY) {
       scheduleSalesSync();
+    }
+
+    if (key === REPORT_STATUS_KEY) {
+      scheduleReportStatusSync();
     }
   };
 
@@ -284,6 +328,10 @@
 
     if (key === SALES_KEY) {
       scheduleSalesSync();
+    }
+
+    if (key === REPORT_STATUS_KEY) {
+      scheduleReportStatusSync();
     }
   };
 
