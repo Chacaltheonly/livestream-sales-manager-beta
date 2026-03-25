@@ -90,6 +90,15 @@
     };
   }
 
+  function buildRequestPayload(action, payload) {
+    return {
+      action,
+      stockSheetName: config.stockSheetName || "Estoque",
+      salesSheetName: config.salesSheetName || "Vendas",
+      ...payload,
+    };
+  }
+
   async function requestJson(action, payload) {
     if (!endpoint) {
       return null;
@@ -101,12 +110,7 @@
         .slice(2)}`;
       const script = document.createElement("script");
       const requestPayload = encodeURIComponent(
-        JSON.stringify({
-          action,
-          stockSheetName: config.stockSheetName || "Estoque",
-          salesSheetName: config.salesSheetName || "Vendas",
-          ...payload,
-        })
+        JSON.stringify(buildRequestPayload(action, payload))
       );
 
       const cleanup = () => {
@@ -126,6 +130,78 @@
 
       script.src = `${endpoint}?callback=${callbackName}&payload=${requestPayload}`;
       document.head.appendChild(script);
+    });
+  }
+
+  async function postJson(action, payload) {
+    if (!endpoint) {
+      return null;
+    }
+
+    return new Promise((resolve, reject) => {
+      const frameName = `__livesellPost_${Date.now()}_${Math.random()
+        .toString(36)
+        .slice(2)}`;
+      const iframe = document.createElement("iframe");
+      const form = document.createElement("form");
+      const payloadInput = document.createElement("input");
+      let submitStarted = false;
+      let settled = false;
+
+      const cleanup = () => {
+        if (iframe.parentNode) {
+          iframe.parentNode.removeChild(iframe);
+        }
+
+        if (form.parentNode) {
+          form.parentNode.removeChild(form);
+        }
+      };
+
+      const finish = (handler) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        window.clearTimeout(timeoutId);
+        window.setTimeout(cleanup, 0);
+        handler();
+      };
+
+      iframe.name = frameName;
+      iframe.style.display = "none";
+
+      form.method = "POST";
+      form.action = endpoint;
+      form.target = frameName;
+      form.style.display = "none";
+
+      payloadInput.type = "hidden";
+      payloadInput.name = "payload";
+      payloadInput.value = JSON.stringify(buildRequestPayload(action, payload));
+      form.appendChild(payloadInput);
+
+      iframe.onload = () => {
+        if (!submitStarted) {
+          return;
+        }
+
+        finish(() => resolve({ ok: true }));
+      };
+
+      iframe.onerror = () => {
+        finish(() => reject(new Error("Falha ao enviar dados para a planilha.")));
+      };
+
+      const timeoutId = window.setTimeout(() => {
+        finish(() => reject(new Error("Tempo limite ao sincronizar com a planilha.")));
+      }, 15000);
+
+      document.body.appendChild(iframe);
+      document.body.appendChild(form);
+      submitStarted = true;
+      form.submit();
     });
   }
 
@@ -189,7 +265,7 @@
     clearTimeout(productsTimer);
     productsTimer = setTimeout(async () => {
       try {
-        await requestJson("syncProducts", { products: readProducts() });
+        await postJson("syncProducts", { products: readProducts() });
       } catch (error) {
         console.error("Falha ao sincronizar estoque.", error);
       }
@@ -204,7 +280,7 @@
     clearTimeout(salesTimer);
     salesTimer = setTimeout(async () => {
       try {
-        await requestJson("syncSales", { sales: readSales() });
+        await postJson("syncSales", { sales: readSales() });
       } catch (error) {
         console.error("Falha ao sincronizar vendas.", error);
       }
