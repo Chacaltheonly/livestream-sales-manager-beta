@@ -1,7 +1,16 @@
 (function () {
   const STORAGE_KEY = "livesell_report_customer_status";
+  const FILTER_STORAGE_KEY = "livesell_report_customer_filter";
   let isEnhancing = false;
   let animationFrameId = 0;
+
+  function readFilter() {
+    return localStorage.getItem(FILTER_STORAGE_KEY) || "all";
+  }
+
+  function writeFilter(nextFilter) {
+    localStorage.setItem(FILTER_STORAGE_KEY, nextFilter);
+  }
 
   function readState() {
     try {
@@ -31,13 +40,6 @@
   function getCustomerCards(reportRoot) {
     return Array.from(reportRoot.querySelectorAll("div.bg-white.rounded-2xl.shadow-sm.border"))
       .filter((card) => card.querySelector("h4"));
-  }
-
-  function createChip(text, type) {
-    const chip = document.createElement("span");
-    chip.className = `report-status-chip ${type}`;
-    chip.textContent = text;
-    return chip;
   }
 
   function createButton(label, className, onClick) {
@@ -78,6 +80,7 @@
 
     let toolbar = headerCard.querySelector(".report-status-toolbar");
     const hiddenKeys = Object.keys(state).filter((key) => state[key] && state[key].hidden);
+    const activeFilter = readFilter();
 
     if (!toolbar) {
       toolbar = document.createElement("div");
@@ -86,6 +89,31 @@
     }
 
     toolbar.innerHTML = "";
+
+    const filterGroup = document.createElement("div");
+    filterGroup.className = "report-filter-group";
+
+    [
+      { id: "all", label: "Todos" },
+      { id: "pending", label: "Pendentes" },
+      { id: "warned", label: "Avisados" },
+      { id: "picked", label: "Retirados" },
+      { id: "hidden", label: "Ocultos" },
+    ].forEach((filterItem) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `report-filter-button ${
+        activeFilter === filterItem.id ? "active" : ""
+      }`.trim();
+      button.textContent = filterItem.label;
+      button.addEventListener("click", () => {
+        writeFilter(filterItem.id);
+        enhanceReport();
+      });
+      filterGroup.appendChild(button);
+    });
+
+    toolbar.appendChild(filterGroup);
 
     if (hiddenKeys.length === 0) {
       return;
@@ -108,6 +136,22 @@
     toolbar.appendChild(resetButton);
   }
 
+  function shouldShowCard(customerState, activeFilter) {
+    switch (activeFilter) {
+      case "pending":
+        return !customerState.hidden && !customerState.warned && !customerState.pickedUp;
+      case "warned":
+        return !customerState.hidden && !!customerState.warned;
+      case "picked":
+        return !customerState.hidden && !!customerState.pickedUp;
+      case "hidden":
+        return !!customerState.hidden;
+      case "all":
+      default:
+        return !customerState.hidden;
+    }
+  }
+
   function renderCardControls(card, state, customerKey, customerName) {
     const headerRow = card.querySelector(".p-6.bg-slate-50");
     const titleWrap = headerRow ? headerRow.querySelector("h4")?.parentElement : null;
@@ -126,12 +170,7 @@
 
     tools.innerHTML = "";
 
-    if (customerState.warned) {
-      tools.appendChild(createChip("Avisado", "warned"));
-    }
-
     if (customerState.pickedUp) {
-      tools.appendChild(createChip("Retirou", "picked"));
       card.classList.add("report-card-muted");
     } else {
       card.classList.remove("report-card-muted");
@@ -194,6 +233,7 @@
     }
 
     const state = readState();
+    const activeFilter = readFilter();
     renderToolbar(reportRoot, state);
 
     getCustomerCards(reportRoot).forEach((card) => {
@@ -206,7 +246,7 @@
       renderCardControls(card, state, customerKey, customerName);
 
       const customerState = state[customerKey] || {};
-      card.style.display = customerState.hidden ? "none" : "";
+      card.style.display = shouldShowCard(customerState, activeFilter) ? "" : "none";
     });
   }
 
