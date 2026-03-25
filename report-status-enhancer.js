@@ -1,5 +1,7 @@
 (function () {
   const STORAGE_KEY = "livesell_report_customer_status";
+  let isEnhancing = false;
+  let animationFrameId = 0;
 
   function readState() {
     try {
@@ -190,12 +192,42 @@
   }
 
   const observer = new MutationObserver(() => {
-    enhanceReport();
+    scheduleEnhance();
   });
 
-  window.addEventListener("load", enhanceReport);
-  window.setTimeout(enhanceReport, 0);
-  window.setTimeout(enhanceReport, 600);
+  function runEnhanceSafely() {
+    if (isEnhancing) {
+      return;
+    }
+
+    isEnhancing = true;
+    observer.disconnect();
+
+    try {
+      enhanceReport();
+    } finally {
+      isEnhancing = false;
+      observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+      });
+    }
+  }
+
+  function scheduleEnhance() {
+    if (animationFrameId) {
+      window.cancelAnimationFrame(animationFrameId);
+    }
+
+    animationFrameId = window.requestAnimationFrame(() => {
+      animationFrameId = 0;
+      runEnhanceSafely();
+    });
+  }
+
+  window.addEventListener("load", scheduleEnhance);
+  window.setTimeout(scheduleEnhance, 0);
+  window.setTimeout(scheduleEnhance, 600);
 
   observer.observe(document.documentElement, {
     childList: true,
