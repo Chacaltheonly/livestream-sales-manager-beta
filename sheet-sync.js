@@ -95,10 +95,8 @@
       return null;
     }
 
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const body = new URLSearchParams({
+      payload: JSON.stringify({
         action,
         stockSheetName: config.stockSheetName || "Estoque",
         salesSheetName: config.salesSheetName || "Vendas",
@@ -106,11 +104,43 @@
       }),
     });
 
-    if (!response.ok) {
-      throw new Error(`Falha ao sincronizar com a planilha (${response.status}).`);
-    }
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+      },
+      mode: "no-cors",
+      body: body.toString(),
+    });
 
-    return response.json();
+    return response;
+  }
+
+  async function requestBootstrapViaJsonp() {
+    return new Promise((resolve, reject) => {
+      const callbackName = `__livesellBootstrap_${Date.now()}_${Math.random()
+        .toString(36)
+        .slice(2)}`;
+      const script = document.createElement("script");
+      const cleanup = () => {
+        delete window[callbackName];
+        script.remove();
+      };
+
+      window[callbackName] = (payload) => {
+        cleanup();
+        resolve(payload);
+      };
+
+      script.onerror = () => {
+        cleanup();
+        reject(new Error("Falha ao carregar bootstrap da planilha."));
+      };
+
+      script.src =
+        `${endpoint}?action=bootstrap&callback=${callbackName}`;
+      document.head.appendChild(script);
+    });
   }
 
   async function bootstrapFromSheets() {
@@ -120,14 +150,7 @@
     }
 
     try {
-      const url = `${endpoint}?action=bootstrap`;
-      const response = await fetch(url, { method: "GET" });
-
-      if (!response.ok) {
-        throw new Error(`Falha ao carregar planilha (${response.status}).`);
-      }
-
-      const payload = await response.json();
+      const payload = await requestBootstrapViaJsonp();
       const products = Array.isArray(payload.products)
         ? payload.products.map(normalizeProductRow).filter(Boolean)
         : [];

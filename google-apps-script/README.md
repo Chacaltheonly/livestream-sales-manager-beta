@@ -10,14 +10,15 @@ Use este script como `Apps Script` vinculado a sua planilha.
 ## Como publicar
 
 1. Abra a planilha.
-2. Vá em `Extensões > Apps Script`.
-3. Cole o conteúdo de `Code.gs`.
+2. Va em `Extensoes > Apps Script`.
+3. Cole o conteudo de `Code.gs`.
 4. Salve o projeto.
-5. Vá em `Implantar > Nova implantação`.
+5. Va em `Implantar > Nova implantacao`.
 6. Escolha `Aplicativo da Web`.
-7. Execute como `Você`.
+7. Execute como `Voce`.
 8. Acesso: `Qualquer pessoa com o link`.
 9. Copie a URL gerada.
+10. Sempre que alterar o script, abra `Implantar > Gerenciar implantacoes` e atualize a implantacao existente.
 
 ## Como ligar no app
 
@@ -31,3 +32,12 @@ window.LIVESELL_CONFIG = {
   syncDebounceMs: 700,
 };
 ```
+
+## Observacao importante
+
+Esta versao do script foi preparada para funcionar com GitHub Pages, usando:
+
+- leitura por `GET` com callback (`JSONP`)
+- escrita por `POST` simples com campo `payload`
+
+Se voce publicou uma versao anterior do script, substitua o codigo e atualize a implantacao.

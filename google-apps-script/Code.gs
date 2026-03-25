@@ -5,7 +5,14 @@ function doGet(e) {
   const action = getParam_(e, "action");
 
   if (action === "bootstrap") {
-    return jsonResponse_(buildBootstrapPayload_());
+    const payload = buildBootstrapPayload_();
+    const callback = getParam_(e, "callback");
+
+    if (callback) {
+      return javascriptResponse_(callback, payload);
+    }
+
+    return jsonResponse_(payload);
   }
 
   return jsonResponse_({
@@ -190,7 +197,14 @@ function parseBody_(e) {
     return {};
   }
 
-  return JSON.parse(e.postData.contents);
+  const raw = e.postData.contents;
+
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    const payload = getFormField_(raw, "payload");
+    return payload ? JSON.parse(payload) : {};
+  }
 }
 
 function getParam_(e, key) {
@@ -205,4 +219,27 @@ function jsonResponse_(payload) {
   return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(
     ContentService.MimeType.JSON
   );
+}
+
+function javascriptResponse_(callback, payload) {
+  const safeCallback = String(callback).replace(/[^\w.$]/g, "");
+  const body = `${safeCallback}(${JSON.stringify(payload)})`;
+  return ContentService.createTextOutput(body).setMimeType(
+    ContentService.MimeType.JAVASCRIPT
+  );
+}
+
+function getFormField_(raw, key) {
+  const parts = String(raw || "").split("&");
+
+  for (let i = 0; i < parts.length; i += 1) {
+    const item = parts[i].split("=");
+    const itemKey = decodeURIComponent(item[0] || "");
+
+    if (itemKey === key) {
+      return decodeURIComponent((item[1] || "").replace(/\+/g, " "));
+    }
+  }
+
+  return "";
 }
