@@ -134,10 +134,11 @@
       const timeout = setTimeout(() => {
         cleanup();
         reject(new Error("Tempo limite ao consultar a planilha."));
-      }, 6000);
+      }, 60000);
       const cleanup = () => {
         clearTimeout(timeout);
-        delete window[callbackName];
+        window[callbackName] = () => {};
+        setTimeout(() => { delete window[callbackName]; }, 120000);
         script.remove();
       };
 
@@ -203,10 +204,11 @@
       const timeout = setTimeout(() => {
         cleanup();
         reject(new Error("Tempo limite ao consultar a planilha."));
-      }, 6000);
+      }, 60000);
       const cleanup = () => {
         clearTimeout(timeout);
-        delete window[callbackName];
+        window[callbackName] = () => {};
+        setTimeout(() => { delete window[callbackName]; }, 120000);
         script.remove();
       };
 
