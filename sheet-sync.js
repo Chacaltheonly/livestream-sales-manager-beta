@@ -131,7 +131,12 @@
         JSON.stringify(buildRequestPayload(action, payload))
       );
 
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error("Tempo limite ao consultar a planilha."));
+      }, 6000);
       const cleanup = () => {
+        clearTimeout(timeout);
         delete window[callbackName];
         script.remove();
       };
@@ -195,7 +200,12 @@
         .toString(36)
         .slice(2)}`;
       const script = document.createElement("script");
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error("Tempo limite ao consultar a planilha."));
+      }, 6000);
       const cleanup = () => {
+        clearTimeout(timeout);
         delete window[callbackName];
         script.remove();
       };
@@ -354,5 +364,36 @@
     return originalFetch(input, init);
   };
 
+  function productSignature(products) {
+    return JSON.stringify(products.map(p => [String(p.id), String(p.name), String(p.barcode), Number(p.stock), Number(p.fullPrice), Number(p.offerPrice)]).sort((a, b) => a[0].localeCompare(b[0])));
+  }
+
+  window.LiveSellStock = {
+    async replace(products) {
+      const serialized = JSON.stringify(products);
+      // Check storage availability before sending any replacement.
+      originalSetItem.call(localStorage, "live_sales_stock_pending", serialized);
+      clearTimeout(productsTimer);
+      if (endpoint) {
+        await postJson("syncProducts", { products });
+        let verified = false;
+        for (let attempt = 0; attempt < 8; attempt++) {
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          try {
+            const remote = await requestBootstrapViaJsonp();
+            if (Array.isArray(remote.products) && productSignature(remote.products) === productSignature(products)) {
+              verified = true;
+              break;
+            }
+          } catch (error) { console.warn("Verificacao do estoque pendente.", error); }
+        }
+        if (!verified) throw new Error("Não foi possível confirmar a gravação na planilha. A troca pode ter sido recebida. Reabra o sistema para conferir antes de tentar novamente. A cópia anterior foi preservada.");
+      }
+      originalSetItem.call(localStorage, PRODUCTS_KEY, serialized);
+      originalRemoveItem.call(localStorage, "live_sales_stock_pending");
+    }
+  };
+
   window.__LIVESELL_BOOTSTRAP__ = bootstrapFromSheets();
 })();
+
